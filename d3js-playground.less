@@ -1,0 +1,37 @@
+@import "../libs/bootstrap-master/less/bootstrap.less";
+@import "../libs/grid.less";
+
+.slider {
+	margin: 10px;
+	padding-left: 20px;
+	width: 200px;
+}
+
+#d3-chart-controls {
+	position: fixed;
+	top: 150px;
+	left: 20px;
+	background-color: rgba(255,255,255,.85);
+	box-shadow: 2px 2px 4px #000;
+	width: 250px;
+	// border: 2px solid rgba(0,0,0,.2);
+	// border-radius: 3px;
+}
+
+#d3-chart svg{
+	border: 2px solid #BBBBBB;
+	border-radius: 3px;
+}
+
+#main-content {
+	.row(12);
+
+	#d3-chart-controls {
+		//.column(2, 12);
+	}
+
+	#d3-chart {
+		.column(10,12);
+		.push(2);
+	}
+}

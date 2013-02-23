@@ -1,0 +1,330 @@
+<html>
+	<head>
+		<script src="http://d3js.org/d3.v3.min.js"></script>
+		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+		<script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.10.1/jquery-ui.min.js"></script>
+		<link rel="stylesheet" href="http://code.jquery.com/ui/1.10.1/themes/base/jquery-ui.css">
+		<link rel="stylesheet" href="d3js-playground.css">
+	</head>
+	<body>
+		<h2>Demo</h2>
+		<div id="main-content">
+			<div id="d3-chart-controls">
+				<div >Number of pins</div>
+				<div class="slider slider-pins"></div>
+				
+				<div>Angle of Frame</div>
+				<div class="slider slider-angle"></div>
+				
+				<div>Ratio of X to Y axis</div>
+				<div class="slider slider-ratio"></div>
+			</div>
+			<div id="d3-chart">
+				<svg id="svg-canvas">
+					<g id="viewport"></g>
+				</svg>
+			</div>
+		</div>
+		
+		<script type="text/javascript">
+
+		(function(){
+
+			var stringArtParams = {};
+			var cos = Math.cos;
+			var sin = Math.sin;
+
+			var defaultArgs = {
+				theta: (0*Math.PI)/180,
+				baseInterval: 500,
+				xyRatio: 1,
+				numYSamples: 10,
+				pinRadius: 2,
+				margin: 10,
+				right: 0 // 0 for left approx, 1 for right approx
+			};
+
+			function populateDefaultArgs(args){
+				// Parameters
+				args = args || defaultArgs;
+				args.theta = args.theta || defaultArgs.theta;
+				args.baseInterval = args.baseInterval || defaultArgs.baseInterval;
+				args.xyRatio = args.xyRatio || defaultArgs.xyRatio;
+				args.numYSamples = args.numYSamples || defaultArgs.numYSamples;
+				args.right = args.right || defaultArgs.right;
+
+				// Display
+				args.pinRadius = args.pinRadius || defaultArgs.pinRadius;
+				args.margin = args.margin || defaultArgs.margin;
+
+				return args;
+			}
+
+			function stringArt(args){
+				// Parameters
+				args = args || defaultArgs;
+				args = populateDefaultArgs(args);
+				var theta = args.theta;
+				var baseInterval = args.baseInterval;
+				var xyRatio = args.xyRatio;
+				var numYSamples = args.numYSamples;
+				var right = args.right;
+
+				// Display
+				var pinRadius = args.pinRadius;
+				var margin = args.margin;
+
+				// Calculated params
+				var cosTheta = cos(theta);
+				var sinTheta = sin(theta);
+				var stepSize = (baseInterval/numYSamples);
+
+				var yOffset = Math.max(0, 
+						sinTheta*baseInterval*xyRatio-baseInterval); 			// If the angle of the x-axis is positive and the ratio large, then it increases the high because it's too tall
+
+				var height = baseInterval										// Base domain for x,y ranges
+					+ Math.abs(Math.min(sinTheta*baseInterval*xyRatio, 0))		// If the angle of the x-axis is negative, then it increases the height of the svg because it's too long
+					+ yOffset													// If the angle theta is positive and the xyRatio too high, increases the heigh of the svg because its too tall
+					+ 2*margin;													// Account for margins on the top and bottom
+
+				var width = (baseInterval * xyRatio * cosTheta)					// Base domain for x, y ranges scaled by xyRatio
+						+ 2*margin;												// Account for margins on the left and right
+
+				// Define SVG canvas and Axes
+				d3.select('#svg-canvas')
+					.attr('height', height)
+					.attr('width', width);
+				
+				var svg = d3.select('#viewport');
+					
+				var axes = [
+					{x1: margin, y1: margin+yOffset, x2:margin, y2: margin+yOffset+baseInterval},
+					{
+						x1: margin, y1: margin+baseInterval+yOffset, 
+						x2: margin+((baseInterval*xyRatio)*cos(theta)), y2: margin+yOffset+baseInterval - (baseInterval*xyRatio*sin(theta))
+					}
+				];
+
+				// Render axes
+				svg.selectAll("line").data(axes).enter().append("line")
+					.attr("x1", function(d,i){return d.x1;})
+					.attr("y1", function(d,i){return d.y1;})
+					.attr("x2", function(d,i){return d.x2;})
+					.attr("y2", function(d,i){return d.y2;})
+					.style("stroke-width","2")
+					.style("stroke","black");
+
+
+				// Calculate pins
+				var yPins = [];
+				var xPins = [];
+				var origin = [{cx: margin, cy: margin+yOffset+baseInterval}];
+				for (var i = 0; i<numYSamples; i++){
+					yPins.push({cx: margin, cy: margin+yOffset+(stepSize*i)});
+					xPins.push({
+						cx: margin + cosTheta*(stepSize*(xyRatio)*(i+right)), 
+						cy: margin+yOffset+(baseInterval)-(sinTheta*stepSize*(i+right)*xyRatio)
+					});
+				}
+
+				var cicles = svg.selectAll("circle").data(yPins.concat(xPins).concat(origin)).enter().append("circle")
+						.attr("cx", function(d,i){return d.cx;})
+						.attr("cy", function(d,i){return d.cy;})
+						.attr("r", pinRadius);
+
+				// Calculate cords
+				var lines = [];
+				for (var i = 0; i<numYSamples; i++){
+					var xPin = xPins[i];
+					var yPin = yPins[i];
+					lines.push({x1: xPin.cx, y1: xPin.cy, x2: yPin.cx, y2: yPin.cy});
+				}
+
+				var svgLines = svg.selectAll(".cord").data(lines).enter().append("line")
+						.attr("x1", function(d,i){return d.x1})
+						.attr("y1", function(d,i){return d.y1})
+						.attr("x2", function(d,i){return d.x2})
+						.attr("y2", function(d,i){return d.y2})
+						.attr("class","cord")
+						.style("stroke-width", "1")
+						.style("stroke", "black")
+						.style("stroke-opacity", ".3");
+
+			}
+
+			function traceLine(args){
+				// Parameters
+				args = args || defaultArgs;
+				args = populateDefaultArgs(args);
+				var theta = args.theta;
+				var baseInterval = args.baseInterval;
+				var xyRatio = args.xyRatio;
+				var numYSamples = args.numYSamples;
+				var right = args.right;
+
+				// Display
+				var pinRadius = args.pinRadius;
+				var margin = args.margin;
+
+				// Calculated params
+				var cosTheta = cos(theta);
+				var sinTheta = sin(theta);
+				var stepSize = (baseInterval/numYSamples);
+
+				var yOffset = Math.max(0, 
+						sinTheta*baseInterval*xyRatio-baseInterval); 			// If the angle of the x-axis is positive and the ratio large, then it increases the high because it's too tall
+
+				var height = baseInterval										// Base domain for x,y ranges
+					+ Math.abs(Math.min(sinTheta*baseInterval*xyRatio, 0))		// If the angle of the x-axis is negative, then it increases the height of the svg because it's too long
+					+ yOffset													// If the angle theta is positive and the xyRatio too high, increases the heigh of the svg because its too tall
+					+ 2*margin;													// Account for margins on the top and bottom
+
+				var width = (baseInterval * xyRatio * cosTheta)					// Base domain for x, y ranges scaled by xyRatio
+						+ 2*margin;												// Account for margins on the left and right
+
+				var axes = [
+					{x1: margin, y1: margin+yOffset, x2:margin, y2: margin+yOffset+baseInterval},
+					{
+						x1: margin, y1: margin+baseInterval+yOffset, 
+						x2: margin+((baseInterval*xyRatio)*cos(theta)), y2: margin+yOffset+baseInterval - (baseInterval*xyRatio*sin(theta))
+					}
+				];
+
+				var svg = d3.select('#viewport');
+				// Create tracer line
+				svg.selectAll(".traceLine")
+					.data([{x1: axes[0].x1, y1: axes[0].y1, x2: axes[1].x1, y2: axes[1].y1}])
+					.enter().append('line')
+					.attr('class','traceLine')
+					.attr('x1', function(d,i){return d.x1;})
+					.attr('y1', function(d,i){return d.y1;})
+					.attr('x2', function(d,i){return d.x2;})
+					.attr('y2', function(d,i){return d.y2;})
+					.style('stroke', '#00FFFF')
+					.style('stroke-width', '2');
+
+				// Create tracer dot
+				svg.selectAll(".traceDot")
+					.data([{cx: axes[0].x1, cy: axes[0].y1, r: 4}])
+					.enter()
+					.append('circle')
+					.attr('class', 'traceDot')
+					.attr('cx', function(d,i){return d.cx;})
+					.attr('cy', function(d,i){return d.cy;})
+					.attr('r', function(d,i){return d.r;})
+					.style("stroke", "#FF0000");
+
+				d3.select('svg').on('mousedown', 
+					function(){
+						// Reset the tracer line
+						d3.selectAll('.traceLine')
+							.attr('x1', axes[0].x1)
+							.attr('y1', axes[0].y1)
+							.attr('x2', axes[1].x1)
+							.attr('y2', axes[1].y1);
+
+						// Reset the tracer dot
+						d3.selectAll('.traceDot')
+							.attr('cx', axes[0].x1)
+							.attr('cy', axes[0].y1);
+
+						// Animate tracer line
+						d3.selectAll('.traceLine')
+							.transition()
+							.delay(0)
+							.duration(3500)
+							.ease('linear')
+							.attr('x1', axes[0].x2)
+							.attr('y1', axes[0].y2)
+							.attr('x2', axes[1].x2)
+							.attr('y2', axes[1].y2);
+
+						// Calculate interpolation of tracer dot
+						var bezierTweenFunction = (function(){
+							var ABdx = axes[0].x2-axes[0].x1;
+							var ABdy = axes[0].y2-axes[0].y1;
+							var BCdx = axes[1].x2-axes[1].x1;
+							var BCdy = axes[1].y2-axes[1].y1;
+
+							return function(t){
+								var d = {
+									cx: axes[0].x1 + t*(ABdx),
+									cy: axes[0].y1 + t*(ABdy)
+								};
+								var e = {
+									cx: axes[1].x1 + t*(BCdx),
+									cy: axes[1].y1 + t*(BCdy)
+								};
+								var DEdx = e.cx-d.cx;
+								var DEdy = e.cy-d.cy;
+								return {
+									cx: d.cx + t*(DEdx),
+									cy: d.cy + t*(DEdy)
+								};
+							}
+						})();
+
+						// Animate tracer dot using above interpolation
+						d3.selectAll('.traceDot')
+							.transition()
+							.delay(0)
+							.duration(3500)
+							.ease("linear")
+							.attrTween("cx", function(){
+								return function(t){
+									return bezierTweenFunction(t).cx;
+								}
+							})
+							.attrTween("cy", function(){
+								return function(t){
+									return bezierTweenFunction(t).cy;
+								}
+							});
+						}
+					);
+			}
+
+			function clearStringArt(){
+				$('#viewport').children().remove();
+			}
+
+			function updateStringArt(){
+				clearStringArt();
+				stringArt(stringArtParams);
+				traceLine(stringArtParams);
+			}
+
+			stringArt();
+			traceLine();
+
+			// Add jQueryUI components
+			$('.slider-pins').slider({min: 5, max: 100, step: 1, value: 10, 
+				slide: function(event, ui){
+					stringArtParams.numYSamples = ui.value;
+					updateStringArt();
+				}
+			});
+
+			$('.slider-angle').slider({min: -1.4, max: 1.4, step: .1, value: 0, 
+				slide: function(event, ui){
+					stringArtParams.theta = ui.value;
+					updateStringArt();
+				}
+			});
+
+			$('.slider-ratio').slider({min: 1, max: 10, step: 1, value: 1, 
+				slide: function(event, ui){
+					stringArtParams.xyRatio = ui.value;
+					updateStringArt();
+				}
+			});
+
+			stringArtParams.numYSamples = 10;
+			stringArtParams.theta = 0;
+			stringArtParams.xyRatio = 1;
+
+
+		})();
+		</script>
+	</body>
+</html>
